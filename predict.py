@@ -77,8 +77,9 @@ class Detector():
         self.init_model()
 
     def init_model(self):
-        # sess = onnxruntime.InferenceSession(self.weights, providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
-        sess = onnxruntime.InferenceSession(self.weights)
+        sess = onnxruntime.InferenceSession(
+            self.weights, providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
+        # sess = onnxruntime.InferenceSession(self.weights)
         self.input_name = sess.get_inputs()[0].name
         output_names = []
         for i in range(len(sess.get_outputs())):
