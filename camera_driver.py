@@ -134,25 +134,34 @@ if __name__ == '__main__':
                 data_pipe.put(img)
                 cv2.waitKey(10)
 
-    def consumer(opt, data_pipe, sender_pipe):
-        detector = Detector(opt)
+    def consumer(opt, data_pipe, sender_pipe, is_ai=False):
+        detector = Detector(opt, is_ai=False)
         while True:
             img = data_pipe.get()
             sender_pipe.put(detector.detect(img))
 
-    def sender(sender_pipe, opt):
+    def sender(sender_pipe, opt, is_ai=False):
         global send_time
         while True:
-            im0, pred_boxes, pred_confes = sender_pipe.get()
             data = {'pos': []}
-            if len(pred_boxes) > 0:
-                for i, _ in enumerate(pred_boxes):
-                    box = pred_boxes[i]
-                    left, top, width, height = box[0], box[1], box[2], box[3]
-                    x = (left + width / 2) / opt.img_size
-                    y = (top + height / 2) / opt.img_size
-                    data['pos'].append({'x': x, 'y': y})
-                    print(data)
+            if is_ai:
+                im0, pred_boxes, pred_confes = sender_pipe.get()
+                if len(pred_boxes) > 0:
+                    for i, _ in enumerate(pred_boxes):
+                        box = pred_boxes[i]
+                        left, top, width, height = box[0], box[1], box[2], box[3]
+                        x = (left + width / 2) / opt.img_size
+                        y = (top + height / 2) / opt.img_size
+                        data['pos'].append({'x': x, 'y': y})
+            else:
+                result = sender_pipe.get()
+                if 4 in result.keys():
+                    data['pos'].append({'x': result[3][0], 'y': result[3][1]})
+                if 5 in result.keys():
+                    data['pos'].append({'x': result[4][0], 'y': result[4][1]})
+
+            if len(data['pos']) > 0:
+                print(data)
                 send_data(opt.ip, opt.port, data)
             print("Time: {}".format((time.time() - send_time) * 1000))
             send_time = time.time()

@@ -67,14 +67,18 @@ def scale_coords(img1_shape, coords, img0_shape, ratio_pad=None):
 
 class Detector():
 
-    def __init__(self, opt):
-        super(Detector, self).__init__()
-        self.img_size = opt.img_size
-        self.threshold = opt.conf_thres
-        self.iou_thres = opt.iou_thres
-        self.stride = 1
-        self.weights = opt.weights
-        self.init_model()
+    def __init__(self, opt, is_ai=False):
+        self.is_ai = is_ai
+        if is_ai:
+            self.img_size = opt.img_size
+            self.threshold = opt.conf_thres
+            self.iou_thres = opt.iou_thres
+            self.stride = 1
+            self.weights = opt.weights
+            self.init_model()
+        else:
+            self.arucoDict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_4X4_50)
+            self.arucoParams = cv2.aruco.DetectorParameters_create()
 
     def init_model(self):
         sess = onnxruntime.InferenceSession(
@@ -104,40 +108,62 @@ class Detector():
         return img
 
     def detect(self, im):
-        img = self.preprocess(im)
-        W, H = img.shape[2:]
+        if self.is_ai:
+            img = self.preprocess(im)
+            W, H = img.shape[2:]
 
-        pred = self.m.run(None, {self.input_name: img})[0]
-        pred = pred.astype(np.float32)
-        pred = np.squeeze(pred, axis=0)
+            pred = self.m.run(None, {self.input_name: img})[0]
+            pred = pred.astype(np.float32)
+            pred = np.squeeze(pred, axis=0)
 
-        boxes = []
-        confidences = []
-        result_set = np.where((pred[:, 4] * pred[:, 5]) > self.threshold)[0]
-        for index in result_set:
-            detection = pred[index]
-            box = detection[0:4]
-            confidence = detection[4] * detection[5]
-            (centerX, centerY, width, height) = box.astype("int")
-            x = int(centerX - (width / 2))
-            y = int(centerY - (height / 2))
+            boxes = []
+            confidences = []
+            result_set = np.where(
+                (pred[:, 4] * pred[:, 5]) > self.threshold)[0]
+            for index in result_set:
+                detection = pred[index]
+                box = detection[0:4]
+                confidence = detection[4] * detection[5]
+                (centerX, centerY, width, height) = box.astype("int")
+                x = int(centerX - (width / 2))
+                y = int(centerY - (height / 2))
 
-            boxes.append([x, y, int(width), int(height)])
-            confidences.append(float(confidence))
+                boxes.append([x, y, int(width), int(height)])
+                confidences.append(float(confidence))
 
-        idxs = cv2.dnn.NMSBoxes(
-            boxes, confidences, self.threshold, self.iou_thres)
+            idxs = cv2.dnn.NMSBoxes(
+                boxes, confidences, self.threshold, self.iou_thres)
 
-        pred_boxes = []
-        pred_confes = []
-        if len(idxs) > 0:
-            for i in idxs.flatten():
-                confidence = confidences[i]
-                if confidence >= self.threshold:
-                    pred_boxes.append(boxes[i])
-                    pred_confes.append(confidence)
+            pred_boxes = []
+            pred_confes = []
+            if len(idxs) > 0:
+                for i in idxs.flatten():
+                    confidence = confidences[i]
+                    if confidence >= self.threshold:
+                        pred_boxes.append(boxes[i])
+                        pred_confes.append(confidence)
 
-        return im, pred_boxes, pred_confes
+            return im, pred_boxes, pred_confes
+        else:
+            W, H = im.shape[1], im.shape[0]
+            (corners, ids, rejected) = cv2.aruco.detectMarkers(
+                im, self.arucoDict, parameters=self.arucoParams)
+            result = {}
+            if len(corners) > 0:
+                ids = ids.flatten()
+                # loop over the detected ArUCo corners
+                for (markerCorner, markerID) in zip(corners, ids):
+                    # extract the marker corners (which are always returned in
+                    # top-left, top-right, bottom-right, and bottom-left order)
+                    corners = markerCorner.reshape((4, 2))
+                    p_x = 0
+                    p_y = 0
+                    for pos in corners:
+                        p_x += pos[0]
+                        p_y += pos[1]
+                    result[markerID] = [
+                        (p_x / 4) / W, (p_y / 4) / H]
+            return result
 
 
 def main(opt):
