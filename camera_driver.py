@@ -45,13 +45,13 @@ def detect_desktop(img):
             corners = markerCorner.reshape((4, 2))
             (topLeft, topRight, bottomRight, bottomLeft) = corners
             # convert each of the (x, y)-coordinate pairs to integers
-            if ids == 0:
+            if markerID == 0:
                 result[0] = (int(topLeft[0]), int(topLeft[1]))
-            elif ids == 1:
+            elif markerID == 1:
                 result[1] = (int(topRight[0]), int(topRight[1]))
-            elif ids == 2:
+            elif markerID == 2:
                 result[2] = (int(bottomLeft[0]), int(bottomLeft[1]))
-            elif ids == 3:
+            elif markerID == 3:
                 result[3] = (int(bottomRight[0]), int(bottomRight[1]))
 
     return result
@@ -106,24 +106,33 @@ if __name__ == '__main__':
     sender_pipe = Queue(QUEUE_SIZE)
 
     def productor(data_pipe, camera_matrix, dist_coefs):
+        adjusted = False
         capture = cv2.VideoCapture(0)
         capture.set(cv2.CAP_PROP_FRAME_WIDTH, 1024)
         capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
         while True:
             ret, frame = capture.read()
             img = calibration(frame, camera_matrix, dist_coefs)
-            corners = detect_desktop(img)
-            print(corners)
-            # dst_pos = np.float32([[0, 0], [img.shape[1], 0],
-            #                      [0, img.shape[0]], [img.shape[1], img.shape[0]]])
-            # print(corners)
-            # transform_mat = cv2.getPerspectiveTransform(
-            #    corners.astype(np.float32), dst_pos)
-            # img = cv2.warpPerspective(
-            #    img, transform_mat, (img.shape[1], img.shape[0]))
-            # cv2.imshow("final", img)
-            data_pipe.put(img)
-            # cv2.waitKey(10)
+            if not adjusted:
+                corners = detect_desktop(img)
+                if len(corners) == 4:
+                    print(corners)
+                    dst_pos = np.float32([[0, 0], [img.shape[1], 0],
+                                          [0, img.shape[0]], [img.shape[1], img.shape[0]]])
+                    print(corners)
+                    real_pos = []
+                    for i in range(0, len(corners)):
+                        real_pos.append([corners[i][0], corners[i][1]])
+
+                    transform_mat = cv2.getPerspectiveTransform(
+                        np.float32(real_pos), dst_pos)
+                    adjusted = True
+            else:
+                img = cv2.warpPerspective(
+                    img, transform_mat, (img.shape[1], img.shape[0]))
+                cv2.imshow("final", img)
+                data_pipe.put(img)
+                cv2.waitKey(10)
 
     def consumer(opt, data_pipe, sender_pipe):
         detector = Detector(opt)
