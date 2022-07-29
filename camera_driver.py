@@ -111,8 +111,10 @@ if __name__ == '__main__':
         capture.set(cv2.CAP_PROP_FRAME_WIDTH, 1024)
         capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
         while True:
-            ret, frame = capture.read()
-            img = calibration(frame, camera_matrix, dist_coefs)
+            ret, img = capture.read()
+            # cv2.imshow("final", img)
+            # cv2.waitKey(10)
+            # img = calibration(frame, camera_matrix, dist_coefs)
             if not adjusted:
                 corners = detect_desktop(img)
                 if len(corners) == 4:
@@ -144,6 +146,7 @@ if __name__ == '__main__':
         global send_time
         while True:
             data = {'pos': [{"x": 0, "y": 0}, {"x": 0, "y": 0}]}
+            updated = False
             if is_ai:
                 im0, pred_boxes, pred_confes = sender_pipe.get()
                 if len(pred_boxes) > 0:
@@ -153,15 +156,17 @@ if __name__ == '__main__':
                         x = (left + width / 2) / opt.img_size
                         y = (top + height / 2) / opt.img_size
                         data['pos'].append({'x': x, 'y': y})
+                        updated = True
             else:
                 result = sender_pipe.get()
                 if 4 in result.keys():
                     data['pos'][0] = {'x': result[4][0], 'y': result[4][1]}
+                    updated = True
                 if 5 in result.keys():
                     data['pos'][1] = {'x': result[5][0], 'y': result[5][1]}
+                    updated = True
 
-            if len(data['pos']) > 0:
-                print(data)
+            if updated:
                 send_data(opt.ip, opt.port, data)
             print("Time: {}".format((time.time() - send_time) * 1000))
             send_time = time.time()
