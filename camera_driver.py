@@ -127,12 +127,12 @@ if __name__ == '__main__':
                     transform_mat = cv2.getPerspectiveTransform(
                         np.float32(real_pos), dst_pos)
                     adjusted = True
+                    cv2.imshow("final", img)
+                    cv2.waitKey()
             else:
                 img = cv2.warpPerspective(
                     img, transform_mat, (img.shape[1], img.shape[0]))
-                cv2.imshow("final", img)
                 data_pipe.put(img)
-                cv2.waitKey(10)
 
     def consumer(opt, data_pipe, sender_pipe, is_ai=False):
         detector = Detector(opt, is_ai=False)
@@ -156,9 +156,9 @@ if __name__ == '__main__':
             else:
                 result = sender_pipe.get()
                 if 4 in result.keys():
-                    data['pos'].append({'x': result[3][0], 'y': result[3][1]})
-                if 5 in result.keys():
                     data['pos'].append({'x': result[4][0], 'y': result[4][1]})
+                if 5 in result.keys():
+                    data['pos'].append({'x': result[5][0], 'y': result[5][1]})
 
             if len(data['pos']) > 0:
                 print(data)
