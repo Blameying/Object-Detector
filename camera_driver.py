@@ -143,7 +143,7 @@ if __name__ == '__main__':
     def sender(sender_pipe, opt, is_ai=False):
         global send_time
         while True:
-            data = {'pos': []}
+            data = {'pos': [{"x": 0, "y": 0}, {"x": 0, "y": 0}]}
             if is_ai:
                 im0, pred_boxes, pred_confes = sender_pipe.get()
                 if len(pred_boxes) > 0:
@@ -156,9 +156,9 @@ if __name__ == '__main__':
             else:
                 result = sender_pipe.get()
                 if 4 in result.keys():
-                    data['pos'].append({'x': result[4][0], 'y': result[4][1]})
+                    data['pos'][0] = {'x': result[4][0], 'y': result[4][1]}
                 if 5 in result.keys():
-                    data['pos'].append({'x': result[5][0], 'y': result[5][1]})
+                    data['pos'][1] = {'x': result[5][0], 'y': result[5][1]}
 
             if len(data['pos']) > 0:
                 print(data)
